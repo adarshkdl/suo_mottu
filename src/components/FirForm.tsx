@@ -216,6 +216,7 @@ export default function FirForm() {
 
   // Derive day-of-week from the first occurrence period's start date, and the
   // Pahar time period from its start time, while those fields are blank.
+  // Also default "Information Received at P.S" day to the occurrence date.
   const firstOccurrence = data.occurrenceTable[0];
   useEffect(() => {
     setData((prev) => {
@@ -228,10 +229,16 @@ export default function FirForm() {
       if (!next.occPeriod?.trim() && first.timeFrom?.trim()) {
         next.occPeriod = paharFromTimeStr(first.timeFrom);
       }
+      if (!next.infoDay?.trim() && first.dateFrom?.trim()) {
+        next.infoDay = first.dateFrom;
+      }
+      if (!next.infoTime?.trim() && first.timeTo?.trim()) {
+        next.infoTime = first.timeTo;
+      }
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firstOccurrence?.dateFrom, firstOccurrence?.timeFrom]);
+  }, [firstOccurrence?.dateFrom, firstOccurrence?.timeFrom, firstOccurrence?.timeTo]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
