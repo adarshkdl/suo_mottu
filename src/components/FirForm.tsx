@@ -443,28 +443,10 @@ export default function FirForm() {
             </div>
           </section>
 
-          {/* 2. Acts & Sections */}
-          <section className="card" data-icon="⚖️">
-            <h2>
-              <span className="step-num">2</span> Acts &amp; Sections{' '}
-              <span className="mal">നിയമം &amp; വകുപ്പുകൾ</span>
-            </h2>
-            <RepeatTable
-              rows={data.actsTable}
-              onChange={(rows) => set('actsTable', rows)}
-              addLabel="Add Act/Section"
-              emptyRow={{ act: '', section: '' }}
-              columns={[
-                { key: 'act', label: 'Act', placeholder: 'Act name' },
-                { key: 'section', label: 'Section', placeholder: 'Section' },
-              ]}
-            />
-          </section>
-
-          {/* 3. Occurrence */}
+          {/* 1. Occurrence */}
           <section className="card" data-icon="⏱️">
             <h2>
-              <span className="step-num">3</span> Occurrence of Offence{' '}
+              <span className="step-num">1</span> Occurrence of Offence{' '}
               <span className="mal">കുറ്റകൃത്യം സംഭവിച്ചത്</span>
             </h2>
             <div className="highlight-panel">
@@ -542,6 +524,24 @@ export default function FirForm() {
               />
             </div>
 
+          </section>
+
+          {/* 2. Acts & Sections */}
+          <section className="card" data-icon="⚖️">
+            <h2>
+              <span className="step-num">2</span> Acts &amp; Sections{' '}
+              <span className="mal">നിയമം &amp; വകുപ്പുകൾ</span>
+            </h2>
+            <RepeatTable
+              rows={data.actsTable}
+              onChange={(rows) => set('actsTable', rows)}
+              addLabel="Add Act/Section"
+              emptyRow={{ act: '', section: '' }}
+              columns={[
+                { key: 'act', label: 'Act', placeholder: 'Act name' },
+                { key: 'section', label: 'Section', placeholder: 'Section' },
+              ]}
+            />
           </section>
 
           {/* 6. Complainant / Informant - hidden: auto-filled from officer profile, review in Preview instead */}
@@ -673,7 +673,7 @@ export default function FirForm() {
           {/* 7. Accused */}
           <section className="card" data-icon="🕵️">
             <h2>
-              <span className="step-num">7</span> Accused Details{' '}
+              <span className="step-num">3</span> Accused Details{' '}
               <span className="mal">കുറ്റവാളികളെ സംബന്ധിച്ച വിശദ വിവരങ്ങൾ</span>
             </h2>
             <AccusedEditor rows={data.accusedTable} onChange={(rows) => set('accusedTable', rows)} />
@@ -682,7 +682,7 @@ export default function FirForm() {
           {/* Victim */}
           <section className="card" data-icon="🧍">
             <h2>
-              <span className="step-num">7b</span> Victim Details{' '}
+              <span className="step-num">4</span> Victim Details{' '}
               <span className="mal">ഇരയെ സംബന്ധിച്ച വിശദ വിവരങ്ങൾ</span>
             </h2>
             <VictimEditor rows={data.victimTable} onChange={(rows) => set('victimTable', rows)} />
@@ -692,7 +692,7 @@ export default function FirForm() {
           {/* 9 & 10. Property */}
           <section className="card" data-icon="💎">
             <h2>
-              <span className="step-num">9</span> Properties of Interest{' '}
+              <span className="step-num">5</span> Properties of Interest{' '}
               <span className="mal">സ്വത്തുക്കളുടെ വിവരം</span>
             </h2>
             <RepeatTable
