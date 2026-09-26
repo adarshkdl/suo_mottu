@@ -27,6 +27,22 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const segmentTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stoppingForSegmentRef = useRef(false);
+
+  // Simple voice-activity detection so silent segments never reach the transcription
+  // API - without this, the model tends to hallucinate a runaway repeated phrase when
+  // fed near-silent audio instead of correctly returning "no speech".
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadRafRef = useRef<number | null>(null);
+  const segmentPeakVolumeRef = useRef(0);
+  const SPEECH_RMS_THRESHOLD = 0.02; // empirical: background noise sits well below this
+
+  // How often (ms) to cut the recording into a segment and transcribe it, so the
+  // composer fills in part by part instead of waiting for the whole recording.
+  const SEGMENT_MS = 6000;
 
   const canSend = text.trim().length > 0 && !loading;
   const busy = loading || describing || recording;
@@ -60,6 +76,56 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
     }
   };
 
+  // Transcribes one short audio segment and appends it to the composer as soon as
+  // it's ready, without touching the "describing" (image/full-clip) busy state -
+  // segment transcription happens quietly in the background while recording continues.
+  // A failure is logged and surfaced once in chat (not per-segment) so silence during
+  // recording doesn't look like nothing is happening.
+  const transcribeSegment = async (blob: Blob) => {
+    if (blob.size === 0) {
+      console.warn('[voice] empty segment blob, skipping');
+      return;
+    }
+    const reader = new FileReader();
+    const dataUrl: string = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => (typeof reader.result === 'string' ? resolve(reader.result) : reject());
+      reader.onerror = () => reject();
+      reader.readAsDataURL(blob);
+    }).catch(() => '');
+    if (!dataUrl) {
+      console.warn('[voice] could not read segment blob as data URL');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/describe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio: dataUrl }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        console.error('[voice] segment transcription failed', res.status, body?.error);
+        reportSegmentError(body?.error || `Transcription failed (${res.status}).`);
+        return;
+      }
+      const chunkText = typeof body.text === 'string' ? body.text.trim() : '';
+      if (chunkText) appendToComposer(chunkText);
+    } catch (err) {
+      console.error('[voice] network error transcribing segment', err);
+      reportSegmentError('Network error while transcribing.');
+    }
+  };
+
+  // Surfaces the first segment error of a recording session to chat, then stays quiet
+  // for the rest of that session so a run of failures doesn't spam the conversation.
+  const segmentErrorShownRef = useRef(false);
+  const reportSegmentError = (msg: string) => {
+    if (segmentErrorShownRef.current) return;
+    segmentErrorShownRef.current = true;
+    addMessage('assistant', `⚠️ Voice transcription issue: ${msg}`);
+  };
+
   const handleImagePick = (file: File | undefined) => {
     if (!file) return;
 
@@ -83,41 +149,123 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
     reader.readAsDataURL(file);
   };
 
+  // Continuously samples the mic's volume (RMS) via Web Audio and tracks the loudest
+  // moment seen since the last reset, so a segment can be classified as "had speech"
+  // or "silence" right before it's transcribed.
+  const startVoiceActivityDetection = (stream: MediaStream) => {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    audioContextRef.current = audioCtx;
+    analyserRef.current = analyser;
+
+    const data = new Float32Array(analyser.fftSize);
+    const sample = () => {
+      analyser.getFloatTimeDomainData(data);
+      let sumSquares = 0;
+      for (let i = 0; i < data.length; i++) sumSquares += data[i] * data[i];
+      const rms = Math.sqrt(sumSquares / data.length);
+      if (rms > segmentPeakVolumeRef.current) segmentPeakVolumeRef.current = rms;
+      vadRafRef.current = requestAnimationFrame(sample);
+    };
+    vadRafRef.current = requestAnimationFrame(sample);
+  };
+
+  const stopVoiceActivityDetection = () => {
+    if (vadRafRef.current !== null) {
+      cancelAnimationFrame(vadRafRef.current);
+      vadRafRef.current = null;
+    }
+    analyserRef.current = null;
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+  };
+
+  // Starts (or restarts) a MediaRecorder on the shared stream. Each time it stops,
+  // its segment is transcribed and appended to the composer; while still recording,
+  // a new recorder is immediately started on the same stream for the next segment -
+  // this is what gives the "part by part" streaming transcription.
+  const startSegmentRecorder = (stream: MediaStream) => {
+    const recorder = new MediaRecorder(stream);
+    audioChunksRef.current = [];
+    segmentPeakVolumeRef.current = 0;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+      audioChunksRef.current = [];
+      const hadSpeech = segmentPeakVolumeRef.current >= SPEECH_RMS_THRESHOLD;
+      segmentPeakVolumeRef.current = 0;
+      if (hadSpeech) {
+        transcribeSegment(blob);
+      } else {
+        console.warn('[voice] segment skipped - no speech detected (peak below threshold)');
+      }
+
+      if (stoppingForSegmentRef.current && audioStreamRef.current) {
+        // Still recording overall - roll straight into the next segment.
+        stoppingForSegmentRef.current = false;
+        startSegmentRecorder(audioStreamRef.current);
+      } else {
+        // Recording was fully stopped by the user.
+        stream.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+  };
+
   const toggleRecording = async () => {
     if (recording) {
-      mediaRecorderRef.current?.stop();
       setRecording(false);
+      if (segmentTimerRef.current) {
+        clearInterval(segmentTimerRef.current);
+        segmentTimerRef.current = null;
+      }
+      stoppingForSegmentRef.current = false;
+      stopVoiceActivityDetection();
+      mediaRecorderRef.current?.stop();
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            describeMedia({ audio: reader.result });
-          }
-        };
-        reader.readAsDataURL(blob);
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start();
+      audioStreamRef.current = stream;
+      segmentErrorShownRef.current = false;
+      startVoiceActivityDetection(stream);
+      startSegmentRecorder(stream);
       setRecording(true);
+
+      // Cut a new segment every SEGMENT_MS so each chunk gets transcribed and
+      // appended to the composer while the user keeps talking.
+      segmentTimerRef.current = setInterval(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          stoppingForSegmentRef.current = true;
+          mediaRecorderRef.current.stop();
+        }
+      }, SEGMENT_MS);
     } catch {
       addMessage('assistant', 'Could not access the microphone. Check browser permissions.');
     }
   };
+
+  // Safety net: if the component unmounts mid-recording, tear down the stream/timer.
+  useEffect(() => {
+    return () => {
+      if (segmentTimerRef.current) clearInterval(segmentTimerRef.current);
+      stopVoiceActivityDetection();
+      audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendMessage = async () => {
     const trimmed = text.trim();

@@ -107,7 +107,7 @@ export default function OccurrenceEditor({
       ))}
 
       <button type="button" className="btn-add" onClick={addRow}>
-        + Add Occurrence Period
+        + Add Occurrence
       </button>
     </div>
   );
