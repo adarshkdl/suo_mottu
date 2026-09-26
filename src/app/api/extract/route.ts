@@ -14,8 +14,11 @@ function buildSystemPrompt(jsonSchema: unknown): string {
     'the complainant/informant - do not extract or invent a separate complainant identity from the text. Only include ' +
     'information that is stated or strongly implied in the text or image. Leave a field as an empty string (or an empty ' +
     'array for lists) when the information is not present - never invent names, dates, ages, or addresses. Dates must be ' +
-    'YYYY-MM-DD and times HH:MM (24-hour). The narrative field should be a clean, formal police-report-style paragraph ' +
-    'summarizing the incident based on the input text.\n\n' +
+    'YYYY-MM-DD and times HH:MM (24-hour). The input text may be in Malayalam, English, or a mix of both - regardless of ' +
+    'the input language, write every extracted field value (including the narrative and any free-text fields) in clear ' +
+    'English, since the FIR is an official English-language document; translate as needed, but keep proper nouns such ' +
+    'as personal names and place names in their standard form rather than transliterating oddly. The narrative field ' +
+    'should be a clean, formal police-report-style English paragraph summarizing the incident based on the input text.\n\n' +
     'Respond with ONLY a single raw JSON object matching this JSON Schema - no markdown code fences, no explanation, ' +
     'no text before or after the JSON:\n\n' +
     JSON.stringify(jsonSchema)
