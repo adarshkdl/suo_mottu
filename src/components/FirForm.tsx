@@ -836,10 +836,12 @@ export default function FirForm() {
       {previewOpen && (
         <div className="preview-overlay no-print">
           <div className="preview-toolbar">
-            <button type="button" className="btn btn-ghost" onClick={() => setPreviewOpen(false)}>
-              ← Edit
-            </button>
-            <span className="preview-toolbar-title">FIR Preview</span>
+            <div className="preview-toolbar-start">
+              <button type="button" className="btn btn-ghost" onClick={() => setPreviewOpen(false)}>
+                ← Edit
+              </button>
+              <span className="preview-toolbar-title">FIR Preview</span>
+            </div>
             <div className="preview-toolbar-actions">
               <button type="button" className="btn btn-secondary" onClick={handleSaveFromPreview}>
                 Save Draft

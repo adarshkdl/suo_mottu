@@ -1,5 +1,16 @@
 import { FirFormData } from '@/lib/types';
 
+// Native <input type="date"> fields always store/submit yyyy-mm-dd - reformat only
+// for display here so the preview/print shows dd/mm/yyyy without touching the
+// underlying form data or the date picker itself.
+function formatDateDMY(iso?: string): string {
+  if (!iso?.trim()) return '';
+  const match = iso.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return iso; // not an ISO date string (e.g. already free text) - show as-is
+  const [, y, m, d] = match;
+  return `${d}/${m}/${y}`;
+}
+
 function RowsOrDash<T extends Record<keyof T, string>>({
   rows,
   cols,
@@ -24,6 +35,38 @@ function RowsOrDash<T extends Record<keyof T, string>>({
         </tr>
       ))}
     </>
+  );
+}
+
+function OccurrenceCards({ rows }: { rows: FirFormData['occurrenceTable'] }) {
+  if (rows.length === 0) {
+    return <p className="pv-freetext">—</p>;
+  }
+  return (
+    <div className="pv-subcards">
+      {rows.map((r, i) => (
+        <div className="pv-subcard" key={i}>
+          {rows.length > 1 && <div className="pv-subcard-title">Occurrence {i + 1}</div>}
+          <div className="pv-grid">
+            <Stat label="Date From" value={formatDateDMY(r.dateFrom)} />
+            <Stat label="Time From" value={r.timeFrom} />
+            <Stat label="Date To" value={formatDateDMY(r.dateTo)} />
+            <Stat label="Time To" value={r.timeTo} />
+            <Stat label="Direction" value={r.directionFromPs} />
+            <Stat label="Distance" value={r.distanceFromPs} />
+            <Stat label="Beat No" value={r.beatNo} />
+            <Stat label="Coordinates" value={r.coordinates} />
+            <Stat label="Outside P.S" value={r.outPs} />
+            <Stat label="Outside District" value={r.outDistrict} />
+            <Stat label="Outside State" value={r.outState} />
+          </div>
+          <div className="pv-subcard-address">
+            <span className="pv-stat-label">Address</span>
+            <span className="pv-stat-value">{r.address?.trim() || '—'}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -99,7 +142,7 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         <div className="pv-hero-grid">
           <Stat label="District" value={d.district} />
           <Stat label="Police Station" value={d.ps} />
-          <Stat label="Date" value={d.firDate} />
+          <Stat label="Date" value={formatDateDMY(d.firDate)} />
           <Stat label="Time" value={d.firTime} />
         </div>
       </div>
@@ -112,40 +155,10 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         <div className="pv-grid">
           <Stat label="Day" value={d.occDay} />
           <Stat label="Period" value={d.occPeriod} />
-          <Stat label="Info Received" value={`${d.infoDay} ${d.infoTime}`.trim()} />
+          <Stat label="Info Received" value={`${formatDateDMY(d.infoDay)} ${d.infoTime}`.trim()} />
           <Stat label="GD Entry" value={d.gdEntryNo ? `${d.gdEntryNo} at ${d.gdTime}` : ''} />
         </div>
-        <PvTable
-          headers={[
-            'Date From',
-            'Time From',
-            'Date To',
-            'Time To',
-            'Direction',
-            'Distance',
-            'Beat No',
-            'Address',
-            'Coordinates',
-            'Outside P.S',
-            'Outside District',
-            'Outside State',
-          ]}
-          cols={[
-            'dateFrom',
-            'timeFrom',
-            'dateTo',
-            'timeTo',
-            'directionFromPs',
-            'distanceFromPs',
-            'beatNo',
-            'address',
-            'coordinates',
-            'outPs',
-            'outDistrict',
-            'outState',
-          ]}
-          rows={d.occurrenceTable}
-        />
+        <OccurrenceCards rows={d.occurrenceTable} />
       </Section>
 
       <Section icon="ℹ️" title="Type of Information">
@@ -161,7 +174,7 @@ function ScreenPreview({ d }: { d: FirFormData }) {
           <Stat label="Relative's Name" value={d.compRelativeName} />
           <Stat label="Age" value={d.compAge} />
           <Stat label="Gender" value={d.compGender} />
-          <Stat label="DOB" value={d.compDob} />
+          <Stat label="DOB" value={formatDateDMY(d.compDob)} />
           <Stat label="Nationality" value={d.compNationality} />
           <Stat label="UID" value={d.compUid} />
           <Stat label="Occupation" value={d.compOccupation} />
@@ -235,7 +248,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
       <p>
         <strong>District:</strong> {d.district} &nbsp; <strong>PS:</strong> {d.ps} &nbsp;
         <strong>FIR No:</strong> {d.firNo || 'XXX'}/{d.firYear} &nbsp;
-        <strong>Date/Time:</strong> {d.firDate} {d.firTime}
+        <strong>Date/Time:</strong> {formatDateDMY(d.firDate)} {d.firTime}
       </p>
 
       <div className="section-title">Acts &amp; Sections</div>
@@ -255,7 +268,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
       <p>
         Day: {d.occDay} | Period: {d.occPeriod}
         <br />
-        Info received at PS: {d.infoDay} {d.infoTime} | GD Entry: {d.gdEntryNo} at {d.gdTime}
+        Info received at PS: {formatDateDMY(d.infoDay)} {d.infoTime} | GD Entry: {d.gdEntryNo} at {d.gdTime}
       </p>
       <table>
         <thead>
@@ -276,7 +289,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </thead>
         <tbody>
           <RowsOrDash
-            rows={d.occurrenceTable}
+            rows={d.occurrenceTable.map((r) => ({ ...r, dateFrom: formatDateDMY(r.dateFrom), dateTo: formatDateDMY(r.dateTo) }))}
             cols={[
               'dateFrom',
               'timeFrom',
@@ -302,7 +315,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
 
       <div className="section-title">Complainant / Informant</div>
       <p>
-        Name: {d.compName} | Relative: {d.compRelativeName} | Age: {d.compAge} | Gender: {d.compGender} | DOB: {d.compDob}
+        Name: {d.compName} | Relative: {d.compRelativeName} | Age: {d.compAge} | Gender: {d.compGender} | DOB: {formatDateDMY(d.compDob)}
         <br />
         Nationality: {d.compNationality} | UID: {d.compUid} | Occupation: {d.compOccupation}
         <br />
