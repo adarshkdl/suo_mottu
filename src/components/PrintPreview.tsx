@@ -104,11 +104,11 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         </div>
       </div>
 
-      <Section n="2" icon="📜" title="Acts &amp; Sections">
+      <Section icon="📜" title="Acts &amp; Sections">
         <PvTable headers={['Act', 'Section']} cols={['act', 'section']} rows={d.actsTable} />
       </Section>
 
-      <Section n="3" icon="🕒" title="Occurrence &amp; Place of Occurrence">
+      <Section icon="🕒" title="Occurrence &amp; Place of Occurrence">
         <div className="pv-grid">
           <Stat label="Day" value={d.occDay} />
           <Stat label="Period" value={d.occPeriod} />
@@ -148,14 +148,14 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         />
       </Section>
 
-      <Section n="4" icon="ℹ️" title="Type of Information">
+      <Section icon="ℹ️" title="Type of Information">
         <div className="pv-grid">
           <Stat label="Info Type" value={d.infoType} />
           <Stat label="Source" value={d.complaintSource} />
         </div>
       </Section>
 
-      <Section n="6" icon="🧑" title="Complainant / Informant">
+      <Section icon="🧑" title="Complainant / Informant">
         <div className="pv-grid">
           <Stat label="Name" value={d.compName} />
           <Stat label="Relative's Name" value={d.compRelativeName} />
@@ -172,7 +172,7 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         <PvTable headers={['Address Type', 'Address']} cols={['addressType', 'address']} rows={d.addressTable} />
       </Section>
 
-      <Section n="7" icon="🕵️" title="Accused Details">
+      <Section icon="🕵️" title="Accused Details">
         <PvTable
           headers={['Name', 'Alias', 'Age', 'Gender', 'Nationality', "Father's Name", 'Tel', 'Present Address', 'Permanent Address']}
           cols={['name', 'alias', 'age', 'gender', 'nationality', 'fatherName', 'tel', 'presentAddress', 'permanentAddress']}
@@ -188,11 +188,11 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         />
       </Section>
 
-      <Section n="8" icon="⏳" title="Reason for Delay">
+      <Section icon="⏳" title="Reason for Delay">
         <p className="pv-freetext">{d.delayReason || '—'}</p>
       </Section>
 
-      <Section n="9" icon="💎" title="Property Details">
+      <Section icon="💎" title="Property Details">
         <PvTable
           headers={['Type', 'Sub Type', 'Description', 'Value (Rs)']}
           cols={['propType', 'subType', 'description', 'value']}
@@ -204,14 +204,14 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         </div>
       </Section>
 
-      <Section n="11" icon="⚖️" title="Inquest / UD Case">
+      <Section icon="⚖️" title="Inquest / UD Case">
         <div className="pv-grid">
           <Stat label="Type" value={d.inquestType} />
           <Stat label="Number" value={d.inquestNo} />
         </div>
       </Section>
 
-      <Section n="12" icon="📝" title="First Information Contents">
+      <Section icon="📝" title="First Information Contents">
         <p className="pv-narrative">{d.narrative || '—'}</p>
       </Section>
 
@@ -238,7 +238,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
         <strong>Date/Time:</strong> {d.firDate} {d.firTime}
       </p>
 
-      <div className="section-title">2. Acts &amp; Sections</div>
+      <div className="section-title">Acts &amp; Sections</div>
       <table>
         <thead>
           <tr>
@@ -251,7 +251,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </tbody>
       </table>
 
-      <div className="section-title">3. Occurrence &amp; Place of Occurrence</div>
+      <div className="section-title">Occurrence &amp; Place of Occurrence</div>
       <p>
         Day: {d.occDay} | Period: {d.occPeriod}
         <br />
@@ -295,12 +295,12 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </tbody>
       </table>
 
-      <div className="section-title">4. Type of Information</div>
+      <div className="section-title">Type of Information</div>
       <p>
         {d.infoType} | Source: {d.complaintSource}
       </p>
 
-      <div className="section-title">6. Complainant / Informant</div>
+      <div className="section-title">Complainant / Informant</div>
       <p>
         Name: {d.compName} | Relative: {d.compRelativeName} | Age: {d.compAge} | Gender: {d.compGender} | DOB: {d.compDob}
         <br />
@@ -331,7 +331,7 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </tbody>
       </table>
 
-      <div className="section-title">7. Accused Details</div>
+      <div className="section-title">Accused Details</div>
       <table>
         <thead>
           <tr>
@@ -377,10 +377,10 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </tbody>
       </table>
 
-      <div className="section-title">8. Reason for Delay</div>
+      <div className="section-title">Reason for Delay</div>
       <p>{d.delayReason}</p>
 
-      <div className="section-title">9. Property Details</div>
+      <div className="section-title">Property Details</div>
       <table>
         <thead>
           <tr>
@@ -395,15 +395,15 @@ function PrintDoc({ d }: { d: FirFormData }) {
         </tbody>
       </table>
       <p>
-        <strong>10. Total Value:</strong> Rs. {d.totalValue}
+        <strong>Total Value:</strong> Rs. {d.totalValue}
       </p>
 
-      <div className="section-title">11. Inquest / UD Case</div>
+      <div className="section-title">Inquest / UD Case</div>
       <p>
         Type: {d.inquestType} | Number: {d.inquestNo}
       </p>
 
-      <div className="section-title">12. First Information Contents</div>
+      <div className="section-title">First Information Contents</div>
       <p style={{ whiteSpace: 'pre-wrap' }}>{d.narrative}</p>
 
       <div className="section-title">Investigating Officer</div>
