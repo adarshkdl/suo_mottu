@@ -22,7 +22,13 @@ import {
 } from '@/lib/types';
 import { loadDraft, saveDraft, clearDraft } from '@/lib/storage';
 import { validateForm, hasOccurrenceAddress, accusedMissingGender, victimMissingGender } from '@/lib/validate';
-import { mergeExtraction, missingExtractionFields } from '@/lib/merge-extraction';
+import {
+  mergeExtraction,
+  missingExtractionFields,
+  missingOptionalSections,
+  OPTIONAL_SECTION_LABELS,
+  OptionalSectionId,
+} from '@/lib/merge-extraction';
 import { ExtractionResult } from '@/lib/extraction-schema';
 
 function useDebouncedEffect(effect: () => void, deps: unknown[], delay: number) {
@@ -295,14 +301,38 @@ export default function FirForm() {
     window.print();
   };
 
-  const handleExtracted = (extracted: ExtractionResult): { filledCount: number; missingFields: string[] } => {
+  const handleExtracted = (
+    extracted: ExtractionResult,
+    confirmedEmptySections: ReadonlySet<OptionalSectionId>
+  ): { filledCount: number; missingFields: string[]; pendingSections: { id: OptionalSectionId; label: string }[] } => {
     const merged = mergeExtraction(data, extracted);
+    // occDay is normally derived later by the useEffect below (from the first
+    // occurrence row's date), but that only fires after this render commits - derive
+    // it here too so a freshly-extracted occurrence date isn't reported as missing.
+    if (!merged.occDay?.trim() && merged.occurrenceTable[0]?.dateFrom?.trim()) {
+      merged.occDay = dayOfWeekFromDateStr(merged.occurrenceTable[0].dateFrom);
+    }
     const filledCount = Object.keys(merged).filter(
       (key) => JSON.stringify(merged[key as keyof FirFormData]) !== JSON.stringify(data[key as keyof FirFormData])
     ).length;
     setData(merged);
-    return { filledCount, missingFields: missingExtractionFields(merged) };
+    const pendingSections = missingOptionalSections(merged, confirmedEmptySections).map((id) => ({
+      id,
+      label: OPTIONAL_SECTION_LABELS[id],
+    }));
+    return { filledCount, missingFields: missingExtractionFields(merged), pendingSections };
   };
+
+  // Re-checks which optional sections are still empty and unconfirmed, without running
+  // a fresh AI extraction - used when the officer just answers "none/not applicable"
+  // for a pending section and there's nothing new to extract from that reply.
+  const checkPendingSections = (
+    confirmedEmptySections: ReadonlySet<OptionalSectionId>
+  ): { id: OptionalSectionId; label: string }[] =>
+    missingOptionalSections(data, confirmedEmptySections).map((id) => ({
+      id,
+      label: OPTIONAL_SECTION_LABELS[id],
+    }));
 
   const handleCoordinatesExtracted = (coordinates: string): boolean => {
     let filled = false;
@@ -823,7 +853,11 @@ export default function FirForm() {
       )}
 
       <PrintPreview d={data} />
-      <AiChatWidget onExtracted={handleExtracted} onCoordinatesExtracted={handleCoordinatesExtracted} />
+      <AiChatWidget
+        onExtracted={handleExtracted}
+        onCoordinatesExtracted={handleCoordinatesExtracted}
+        onCheckPendingSections={checkPendingSections}
+      />
     </>
   );
 }
