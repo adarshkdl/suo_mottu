@@ -4,11 +4,13 @@ import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { ExtractionResult } from '@/lib/extraction-schema';
 import { readGpsFromJpeg, formatCoords } from '@/lib/exif';
 import { OptionalSectionId } from '@/lib/merge-extraction';
+import { AttachmentRow } from '@/lib/types';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
+  attachment?: AttachmentRow;
 }
 
 interface PendingSection {
@@ -23,6 +25,7 @@ interface AiChatWidgetProps {
   ) => { filledCount: number; missingFields: string[]; pendingSections: PendingSection[] };
   onCoordinatesExtracted?: (coordinates: string) => boolean;
   onCheckPendingSections: (confirmedEmptySections: ReadonlySet<OptionalSectionId>) => PendingSection[];
+  onAttachmentAdded: (attachment: AttachmentRow) => void;
 }
 
 // Recognizes a short "no data for this" reply (in English or common transliterations)
@@ -33,7 +36,12 @@ function looksLikeNullAnswer(text: string): boolean {
   return NULL_ANSWER_RE.test(text);
 }
 
-export default function AiChatWidget({ onExtracted, onCoordinatesExtracted, onCheckPendingSections }: AiChatWidgetProps) {
+export default function AiChatWidget({
+  onExtracted,
+  onCoordinatesExtracted,
+  onCheckPendingSections,
+  onAttachmentAdded,
+}: AiChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -71,8 +79,8 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted, onCh
   const canSend = text.trim().length > 0 && !loading;
   const busy = loading || describing || recording;
 
-  const addMessage = (role: ChatMessage['role'], msgText: string) => {
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, text: msgText }]);
+  const addMessage = (role: ChatMessage['role'], msgText: string, attachment?: AttachmentRow) => {
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, text: msgText, attachment }]);
   };
 
   const appendToComposer = (generated: string) => {
@@ -167,6 +175,17 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted, onCh
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        const attachment: AttachmentRow = {
+          name: file.name,
+          type: file.type,
+          dataUrl: reader.result,
+          size: file.size,
+        };
+        // Show the attachment as its own chat bubble and record it on the form so
+        // it also shows up in the FIR Preview, then still run it through the usual
+        // image-description flow to pull incident text out of it.
+        addMessage('user', `📎 Attached: ${file.name}`, attachment);
+        onAttachmentAdded(attachment);
         describeMedia({ image: reader.result });
       }
     };
@@ -421,6 +440,10 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted, onCh
             ) : (
               messages.map((m) => (
                 <div key={m.id} className={`ai-chat-bubble-msg ai-chat-bubble-msg--${m.role}`}>
+                  {m.attachment?.type.startsWith('image/') && (
+                    // eslint-disable-next-line @next/next/no-img-element -- small inline data-URL preview, not worth next/image here
+                    <img src={m.attachment.dataUrl} alt={m.attachment.name} className="ai-chat-attachment-thumb" />
+                  )}
                   {m.text}
                 </div>
               ))

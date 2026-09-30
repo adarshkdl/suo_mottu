@@ -19,9 +19,16 @@ import {
   EMPTY_ID_ROW,
   EMPTY_ADDRESS_ROW,
   EMPTY_PROPERTY_ROW,
+  AttachmentRow,
 } from '@/lib/types';
 import { loadDraft, saveDraft, clearDraft } from '@/lib/storage';
-import { validateForm, hasOccurrenceAddress, accusedMissingGender, victimMissingGender } from '@/lib/validate';
+import {
+  validateForm,
+  hasOccurrenceAddress,
+  accusedMissingGender,
+  victimMissingGender,
+  REQUIRED_FIELD_LABELS,
+} from '@/lib/validate';
 import {
   mergeExtraction,
   missingExtractionFields,
@@ -167,9 +174,11 @@ export default function FirForm() {
   useDebouncedEffect(
     () => {
       if (!hydrated.current) return;
-      const savedAt = saveDraft(data);
+      const { savedAt, quotaExceeded } = saveDraft(data);
       if (savedAt) {
         setDraftStatus(`Draft saved at ${new Date(savedAt).toLocaleTimeString()}`);
+      } else if (quotaExceeded) {
+        setDraftStatus('Draft too large to save (attached photos) - remove some or export instead');
       }
     },
     [data],
@@ -254,7 +263,8 @@ export default function FirForm() {
       const first = fieldRefs.current[missing[0]];
       first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       first?.focus();
-      alert('Please fill in all required fields (marked with *).');
+      const missingLabels = missing.map((id) => REQUIRED_FIELD_LABELS[id]).join(', ');
+      alert(`Please fill in the following required field(s): ${missingLabels}.`);
       return;
     }
     if (!hasOccurrenceAddress(data)) {
@@ -273,9 +283,19 @@ export default function FirForm() {
   };
 
   const handleSaveFromPreview = () => {
-    const savedAt = saveDraft(data);
-    if (savedAt) setDraftStatus(`Draft saved at ${new Date(savedAt).toLocaleTimeString()}`);
-    alert('Draft saved.');
+    const { savedAt, quotaExceeded } = saveDraft(data);
+    if (savedAt) {
+      setDraftStatus(`Draft saved at ${new Date(savedAt).toLocaleTimeString()}`);
+      alert('Draft saved.');
+    } else if (quotaExceeded) {
+      setDraftStatus('Draft too large to save (attached photos) - remove some or export instead');
+      alert(
+        'Could not save the draft locally - it is too large, most likely due to attached photos. ' +
+          'Remove an attachment or use Export instead of Save Draft.'
+      );
+    } else {
+      alert('Could not save the draft.');
+    }
   };
 
   const handleClear = () => {
@@ -353,6 +373,10 @@ export default function FirForm() {
       };
     });
     return filled;
+  };
+
+  const handleAttachmentAdded = (attachment: AttachmentRow) => {
+    setData((prev) => ({ ...prev, attachments: [...prev.attachments, attachment] }));
   };
 
   const isInvalid = (id: RequiredFieldId) => invalidFields.has(id);
@@ -859,6 +883,7 @@ export default function FirForm() {
         onExtracted={handleExtracted}
         onCoordinatesExtracted={handleCoordinatesExtracted}
         onCheckPendingSections={checkPendingSections}
+        onAttachmentAdded={handleAttachmentAdded}
       />
     </>
   );

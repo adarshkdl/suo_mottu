@@ -228,6 +228,24 @@ function ScreenPreview({ d }: { d: FirFormData }) {
         <p className="pv-narrative">{d.narrative || '—'}</p>
       </Section>
 
+      {d.attachments.length > 0 && (
+        <Section icon="📎" title="Attachments">
+          <div className="pv-attachments">
+            {d.attachments.map((a, i) => (
+              <div className="pv-attachment" key={i}>
+                {a.type.startsWith('image/') ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- small inline data-URL thumbnail
+                  <img src={a.dataUrl} alt={a.name} className="pv-attachment-thumb" />
+                ) : (
+                  <div className="pv-attachment-icon" aria-hidden="true">📄</div>
+                )}
+                <span className="pv-attachment-name">{a.name}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       <Section icon="👮" title="Investigating Officer">
         <div className="pv-grid">
           <Stat label="Name" value={d.ioName} />
@@ -418,6 +436,13 @@ function PrintDoc({ d }: { d: FirFormData }) {
 
       <div className="section-title">First Information Contents</div>
       <p style={{ whiteSpace: 'pre-wrap' }}>{d.narrative}</p>
+
+      {d.attachments.length > 0 && (
+        <>
+          <div className="section-title">Attachments</div>
+          <p>{d.attachments.map((a) => a.name).join(', ')}</p>
+        </>
+      )}
 
       <div className="section-title">Investigating Officer</div>
       <p>
