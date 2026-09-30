@@ -35,6 +35,33 @@ export function missingExtractionFields(merged: FirFormData): string[] {
   return missing;
 }
 
+// Sections whose table can legitimately be empty (e.g. no accused known yet), so
+// rather than being hard-required they're asked about once and can be explicitly
+// confirmed as "not applicable" by the officer instead of being force-filled.
+export type OptionalSectionId = 'actsTable' | 'accusedTable' | 'victimTable' | 'propertyTable';
+
+export const OPTIONAL_SECTION_LABELS: Record<OptionalSectionId, string> = {
+  actsTable: 'Acts & Sections',
+  accusedTable: 'Accused Details',
+  victimTable: 'Victim Details',
+  propertyTable: 'Properties of Interest',
+};
+
+export const OPTIONAL_SECTION_IDS = Object.keys(OPTIONAL_SECTION_LABELS) as OptionalSectionId[];
+
+/**
+ * Optional sections that are still empty on the merged form data and haven't yet
+ * been explicitly confirmed as not applicable by the officer.
+ */
+export function missingOptionalSections(
+  merged: FirFormData,
+  confirmedEmpty: ReadonlySet<OptionalSectionId>
+): OptionalSectionId[] {
+  return OPTIONAL_SECTION_IDS.filter(
+    (id) => merged[id].length === 0 && !confirmedEmpty.has(id)
+  );
+}
+
 // Fields whose EMPTY_FIR_FORM value is a preset default rather than officer-entered
 // data, so AI extraction is allowed to replace it (an actual manual edit will no
 // longer equal the preset and will therefore be left alone).

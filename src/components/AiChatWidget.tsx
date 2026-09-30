@@ -3,6 +3,7 @@
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { ExtractionResult } from '@/lib/extraction-schema';
 import { readGpsFromJpeg, formatCoords } from '@/lib/exif';
+import { OptionalSectionId } from '@/lib/merge-extraction';
 
 interface ChatMessage {
   id: string;
@@ -10,18 +11,41 @@ interface ChatMessage {
   text: string;
 }
 
-interface AiChatWidgetProps {
-  onExtracted: (data: ExtractionResult) => { filledCount: number; missingFields: string[] };
-  onCoordinatesExtracted?: (coordinates: string) => boolean;
+interface PendingSection {
+  id: OptionalSectionId;
+  label: string;
 }
 
-export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: AiChatWidgetProps) {
+interface AiChatWidgetProps {
+  onExtracted: (
+    data: ExtractionResult,
+    confirmedEmptySections: ReadonlySet<OptionalSectionId>
+  ) => { filledCount: number; missingFields: string[]; pendingSections: PendingSection[] };
+  onCoordinatesExtracted?: (coordinates: string) => boolean;
+  onCheckPendingSections: (confirmedEmptySections: ReadonlySet<OptionalSectionId>) => PendingSection[];
+}
+
+// Recognizes a short "no data for this" reply (in English or common transliterations)
+// so a pending section question can be confirmed as not applicable instead of being
+// sent through full AI extraction.
+const NULL_ANSWER_RE = /^\s*(?:n\/?a|none|nil|null|no|nope|not applicable|nothing|skip)\s*[.!]?\s*$/i;
+function looksLikeNullAnswer(text: string): boolean {
+  return NULL_ANSWER_RE.test(text);
+}
+
+export default function AiChatWidget({ onExtracted, onCoordinatesExtracted, onCheckPendingSections }: AiChatWidgetProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [recording, setRecording] = useState(false);
+  // Sections the officer has explicitly confirmed as not applicable - once confirmed,
+  // never asked about again for the rest of this session.
+  const confirmedEmptySectionsRef = useRef<Set<OptionalSectionId>>(new Set());
+  // The section(s) the assistant most recently asked about, so a short "none"-style
+  // reply can be attributed to them instead of being run through full extraction.
+  const [awaitingSectionAnswer, setAwaitingSectionAnswer] = useState<PendingSection[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -267,13 +291,44 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Asks about whichever optional sections are still empty and unconfirmed, tracking
+  // them as "awaiting answer" so the next short reply can be matched back to them.
+  const askAboutPendingSections = (pending: PendingSection[]) => {
+    if (pending.length === 0) {
+      setAwaitingSectionAnswer([]);
+      return;
+    }
+    setAwaitingSectionAnswer(pending);
+    const labels = pending.map((s) => s.label).join(', ');
+    addMessage(
+      'assistant',
+      `Do you have any details for: ${labels}? If not applicable, just reply "none" and I'll mark ${pending.length === 1 ? 'it' : 'them'} as not applicable.`
+    );
+  };
+
   const sendMessage = async () => {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
     addMessage('user', trimmed);
     setText('');
-    setLoading(true);
 
+    // If we just asked about specific empty sections and this reply is a short
+    // "none/n-a/no" style answer, confirm those sections as not applicable instead of
+    // running the reply through full AI extraction.
+    if (awaitingSectionAnswer.length > 0 && looksLikeNullAnswer(trimmed)) {
+      const confirmed = awaitingSectionAnswer;
+      confirmed.forEach((s) => confirmedEmptySectionsRef.current.add(s.id));
+      setAwaitingSectionAnswer([]);
+      addMessage(
+        'assistant',
+        `Got it - marked ${confirmed.map((s) => s.label).join(', ')} as not applicable.`
+      );
+      const stillPending = onCheckPendingSections(confirmedEmptySectionsRef.current);
+      askAboutPendingSections(stillPending);
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch('/api/extract', {
         method: 'POST',
@@ -287,7 +342,10 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
         return;
       }
 
-      const { filledCount, missingFields } = onExtracted(body.data as ExtractionResult);
+      const { filledCount, missingFields, pendingSections } = onExtracted(
+        body.data as ExtractionResult,
+        confirmedEmptySectionsRef.current
+      );
       const filledMsg =
         filledCount > 0
           ? `Done! I filled ${filledCount} field${filledCount === 1 ? '' : 's'} in the form based on your description.`
@@ -299,6 +357,12 @@ export default function AiChatWidget({ onExtracted, onCoordinatesExtracted }: Ai
           'assistant',
           `I still need the following to complete the report: ${missingFields.join(', ')}. Could you provide these?`
         );
+      }
+
+      // Only chase optional sections once the hard-required fields are sorted out,
+      // so the officer isn't asked about accused/victim/property before the basics.
+      if (missingFields.length === 0) {
+        askAboutPendingSections(pendingSections);
       }
     } catch {
       addMessage('assistant', 'Network error - could not reach the extraction service.');
