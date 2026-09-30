@@ -74,6 +74,13 @@ export interface PropertyRow {
 }
 export const EMPTY_PROPERTY_ROW: PropertyRow = { propType: '', subType: '', description: '', value: '' };
 
+export interface AttachmentRow {
+  name: string;
+  type: string; // MIME type, e.g. "image/jpeg"
+  dataUrl: string;
+  size: number; // bytes, for the "too large for draft" warning
+}
+
 export interface OccurrenceRow {
   dateFrom: string;
   timeFrom: string;
@@ -170,6 +177,9 @@ export interface FirFormData {
   ioPen: string;
   ioMobile: string;
   ioAge: string;
+
+  // Attached files (photos etc. picked in the AI chat)
+  attachments: AttachmentRow[];
 }
 
 export const EMPTY_FIR_FORM: FirFormData = {
@@ -227,7 +237,11 @@ export const EMPTY_FIR_FORM: FirFormData = {
   ioPen: '',
   ioMobile: '',
   ioAge: '',
+
+  attachments: [],
 };
+
+export const EMPTY_ATTACHMENT_ROW: AttachmentRow = { name: '', type: '', dataUrl: '', size: 0 };
 
 export type RequiredFieldId =
   | 'district' | 'ps' | 'firDate' | 'firTime'

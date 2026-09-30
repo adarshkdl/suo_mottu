@@ -491,6 +491,15 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+.ai-chat-attachment-thumb {
+  display: block;
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  object-fit: cover;
+}
+
 .ai-chat-typing {
   display: flex;
   align-items: center;
@@ -1330,6 +1339,42 @@ details.collapsible[open] summary { margin-bottom: 12px; }
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.pv-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pv-attachment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100px;
+}
+.pv-attachment-thumb {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+}
+.pv-attachment-icon {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary-light);
+}
+.pv-attachment-name {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  text-align: center;
+  word-break: break-word;
 }
 
 .pv-table {

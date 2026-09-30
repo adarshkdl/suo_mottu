@@ -7,14 +7,24 @@ export interface DraftEnvelope {
   savedAt: string;
 }
 
-export function saveDraft(data: FirFormData): string | null {
+export interface SaveDraftResult {
+  savedAt: string | null;
+  // true when saving failed specifically because the draft (likely due to attached
+  // photos) exceeded the browser's localStorage quota, so the caller can show a
+  // targeted warning instead of a generic failure message.
+  quotaExceeded: boolean;
+}
+
+export function saveDraft(data: FirFormData): SaveDraftResult {
   try {
     const savedAt = new Date().toISOString();
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ data, savedAt }));
-    return savedAt;
+    return { savedAt, quotaExceeded: false };
   } catch (e) {
     console.warn('Could not save draft', e);
-    return null;
+    const isQuotaError =
+      e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
+    return { savedAt: null, quotaExceeded: isQuotaError };
   }
 }
 
